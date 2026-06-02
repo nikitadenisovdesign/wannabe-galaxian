@@ -36,16 +36,25 @@
   /* ---- HUD ---- */
   #hud{
     position:absolute; top:0; left:0; right:0;
-    display:flex; justify-content:center; align-items:flex-start;
-    gap:clamp(24px, 6vw, 80px);
-    padding:14px 60px 0;
-    color:#fff; font-size:15px; letter-spacing:2px;
-    text-shadow:0 0 8px rgba(120,140,255,.7);
+    display:grid; grid-template-columns:1fr auto 1fr; align-items:start;
+    padding:10px 14px 0;
     pointer-events:none; z-index:5;
   }
-  #hud > div{ text-align:center; }
   #hud.hidden{ display:none; }
-  #hud .label{ color:#ff4d4d; font-size:11px; display:block; letter-spacing:3px; }
+  .hud-left{ justify-self:start; text-align:left; padding-left:clamp(104px, 14vw, 178px); }
+  .hud-center{ justify-self:center; text-align:center; }
+  .hud-right{ justify-self:end; text-align:right; padding-right:46px;
+    display:flex; gap:4px; align-items:center; min-height:30px; }
+  .hlabel{
+    display:block; color:#ff2d2d; font-size:13px; font-weight:bold;
+    letter-spacing:2px; line-height:1.1; text-shadow:0 0 6px rgba(255,60,40,.5);
+  }
+  .hval{
+    display:block; font-size:19px; font-weight:bold; letter-spacing:1px; line-height:1.1;
+  }
+  .hval.score{ color:#fff; text-shadow:0 0 8px rgba(255,255,255,.4); }
+  .hval.hi{ color:#3b7bff; text-shadow:0 0 8px rgba(60,120,255,.6); }
+  .life-flag{ width:20px; height:15px; display:block; filter:drop-shadow(0 0 4px rgba(255,40,30,.5)); }
 
   /* sound toggle */
   #muteBtn{
@@ -71,9 +80,15 @@
     transition:opacity .5s ease, transform .5s ease;
   }
   #cornerLogo.show{ opacity:.92; transform:none; }
-  #hud .val{ color:#fff; font-size:18px; }
-  #lives{ display:flex; gap:6px; align-items:center; }
-  #lives .label{ color:#3df0c0; }
+
+  /* narrow screens: drop the decorative in-game logo so the arcade HUD stays clean */
+  @media (max-width:600px){
+    #cornerLogo{ display:none; }
+    .hud-left{ padding-left:8px; }
+    .hud-right{ padding-right:52px; }
+    .hlabel{ font-size:11px; letter-spacing:1px; }
+    .hval{ font-size:15px; }
+  }
 
   /* ---- overlays ---- */
   .overlay{
@@ -149,9 +164,9 @@
     <canvas id="game"></canvas>
 
     <div id="hud" class="hidden">
-      <div><span class="label">1UP</span><span class="val" id="score">0</span></div>
-      <div style="text-align:center"><span class="label">HI-SCORE</span><span class="val" id="hiscore">0</span></div>
-      <div id="lives"><span class="label">LIVES</span><span class="val" id="livesVal">3</span></div>
+      <div class="hud-left"><span class="hlabel">1UP</span><span class="hval score" id="score">0</span></div>
+      <div class="hud-center"><span class="hlabel">HI-SCORE</span><span class="hval hi" id="hiscore">0</span></div>
+      <div class="hud-right" id="lives"></div>
     </div>
 
     <!-- sound toggle + brand mark -->
@@ -221,11 +236,12 @@ window.addEventListener('resize', fitCanvas);
 // Layout constants derived from current VW (recomputed on resize)
 let COL_SP = 30, ROW_SP = 24, EN_SIZE = 20, FLAG_SIZE = 26, TOP_Y = 70;
 function computeLayout(){
-  COL_SP    = Math.max(26, Math.min(46, VW * 0.72 / (COLS - 1)));
-  ROW_SP    = COL_SP * 0.9;                                   // near-square grid cells
-  EN_SIZE   = Math.max(16, Math.min(24, COL_SP * 0.5));
-  FLAG_SIZE = EN_SIZE * 1.3;
-  TOP_Y     = 60;
+  // dense, tightly-packed formation (like the arcade reference)
+  COL_SP    = Math.min(40, VW * 0.84 / (COLS - 1));
+  EN_SIZE   = Math.max(11, Math.min(30, COL_SP * 0.82));     // ships nearly touching
+  FLAG_SIZE = EN_SIZE * 1.22;
+  ROW_SP    = EN_SIZE * 1.12;                                // rows tightly stacked
+  TOP_Y     = 76;                                            // clear the HUD
 }
 // Home position for a formation slot
 function slotPos(row, col, flagship){
@@ -384,19 +400,19 @@ let particles = [];
 let stars = [];
 
 // formation params
-const COLS = 8;
+const COLS = 10;
 let formationDir = 1;
 let formationOffset = 0;
 let formationSway = 0;
 
-// row color tiers (matching reference photo: flagship gold, red, purple, teal x3)
+// row color tiers — dense Galaxian palette (flagship, red, blue, green×2, blue)
 const ROW_DEFS = [
-  { color:'#ffcf2e', glow:'#ff9b1f', score:200, flagship:true },
-  { color:'#ff3535', glow:'#ff5a5a', score:150 },
-  { color:'#b23bff', glow:'#d07bff', score:80  },
-  { color:'#2fd0d0', glow:'#7bf0f0', score:60  },
-  { color:'#2fd0d0', glow:'#7bf0f0', score:60  },
-  { color:'#2fd0d0', glow:'#7bf0f0', score:60  },
+  { color:'#ffcf2e', glow:'#ff7a1f', score:200, flagship:true },
+  { color:'#ff2d2d', glow:'#ff7a6a', score:150 },
+  { color:'#2f74ff', glow:'#86b0ff', score:80  },
+  { color:'#33d23a', glow:'#92ff8c', score:60  },
+  { color:'#33d23a', glow:'#92ff8c', score:60  },
+  { color:'#2f74ff', glow:'#86b0ff', score:50  },
 ];
 
 /* ---- starfield ---- */
@@ -423,7 +439,7 @@ function buildFormation(){
     const colsThisRow = def.flagship ? 2 : COLS;
     for (let c=0;c<colsThisRow;c++){
       let homeCol;
-      if (def.flagship){ homeCol = c===0 ? 2 : 5; }
+      if (def.flagship){ homeCol = c===0 ? 3 : 6; }
       else homeCol = c;
       const L = slotPos(r, homeCol, def.flagship);
       enemies.push({
@@ -635,10 +651,16 @@ function addScore(n){
   updateHUD();
 }
 
+const FLAG_SVG = '<svg class="life-flag" viewBox="0 0 20 15"><rect x="1" y="0" width="2.4" height="15" fill="#ff2d2d"/><path d="M3.4 0.5 L19 4 L3.4 7.5 Z" fill="#ff2d2d"/></svg>';
 function updateHUD(){
   document.getElementById('score').textContent=game.score;
   document.getElementById('hiscore').textContent=game.hi;
-  document.getElementById('livesVal').textContent=game.lives;
+  // lives shown as red pennant flags (cap the count drawn)
+  const el = document.getElementById('lives');
+  const shown = Math.min(game.lives, 6);
+  let html = FLAG_SVG.repeat(Math.max(0, shown));
+  if (game.lives > 6) html += '<span style="color:#ff2d2d;font:bold 13px monospace;align-self:center">+'+(game.lives-6)+'</span>';
+  el.innerHTML = html;
 }
 
 function showOverlay(id){ document.getElementById(id).classList.remove('hidden'); }
@@ -912,10 +934,10 @@ function banner(txt,color){
 function buildScoreTable(){
   const wrap=document.getElementById('scoreTable');
   const rows=[
-    {c:'#ffcf2e', g:'#ff9b1f', s:'200 PTS', size:22},
-    {c:'#ff3535', g:'#ff5a5a', s:'150 PTS', size:20},
-    {c:'#b23bff', g:'#d07bff', s:'80 PTS',  size:18},
-    {c:'#2fd0d0', g:'#7bf0f0', s:'60 PTS',  size:16},
+    {c:'#ffcf2e', g:'#ff7a1f', s:'200 PTS', size:22},
+    {c:'#ff2d2d', g:'#ff7a6a', s:'150 PTS', size:20},
+    {c:'#2f74ff', g:'#86b0ff', s:'80 PTS',  size:18},
+    {c:'#33d23a', g:'#92ff8c', s:'60 PTS',  size:16},
   ];
   wrap.innerHTML='';
   rows.forEach(r=>{
