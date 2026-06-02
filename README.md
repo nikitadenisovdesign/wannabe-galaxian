@@ -29,7 +29,8 @@ python3 -m http.server 8753
 - 🔊 **Fully synthesized sound** via Web Audio — shooting, explosions, dive sirens, the bouncy bass loop, extra-life and stage-clear jingles.
 - ✨ Particle explosions, screen shake, hit flash, scrolling starfield, floating score popups.
 - 💯 Hi-score saved to `localStorage`, extra life at 5,000 pts, escalating difficulty per stage.
-- 📱 Responsive portrait playfield with touch controls on mobile.
+- 🖥️ **True fullscreen** — the playfield adapts to any aspect ratio edge-to-edge (no letterboxing, no distortion); the logo is the splash hero, then docks to the top-left corner in-game.
+- 📱 Responsive on desktop and mobile, with on-screen touch controls.
 
 ## Scoring
 

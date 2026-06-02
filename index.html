@@ -22,16 +22,12 @@
   }
   #wrap{
     position:fixed; inset:0;
-    display:flex; align-items:center; justify-content:center;
-    background:
-      radial-gradient(ellipse at 50% -10%, #0b0b2a 0%, #000 60%);
+    background:#000;
   }
   #stage{
-    position:relative;
-    height:100%;
-    aspect-ratio:3 / 4;
-    max-width:100%;
-    box-shadow:0 0 60px rgba(60,80,255,.18), inset 0 0 120px rgba(0,0,40,.6);
+    position:absolute; inset:0;
+    width:100vw; height:100vh;
+    width:100dvw; height:100dvh;
     background:#000;
     overflow:hidden;
   }
@@ -40,12 +36,14 @@
   /* ---- HUD ---- */
   #hud{
     position:absolute; top:0; left:0; right:0;
-    display:flex; justify-content:space-between;
-    padding:14px 52px 0 18px;
+    display:flex; justify-content:center; align-items:flex-start;
+    gap:clamp(24px, 6vw, 80px);
+    padding:14px 60px 0;
     color:#fff; font-size:15px; letter-spacing:2px;
     text-shadow:0 0 8px rgba(120,140,255,.7);
     pointer-events:none; z-index:5;
   }
+  #hud > div{ text-align:center; }
   #hud.hidden{ display:none; }
   #hud .label{ color:#ff4d4d; font-size:11px; display:block; letter-spacing:3px; }
 
@@ -63,16 +61,16 @@
   #muteBtn:active{ transform:scale(.92); }
   #muteBtn.muted{ color:#ff7a7a; border-color:rgba(255,120,120,.5); }
 
-  /* corner brand mark */
+  /* in-game brand mark (top-left) */
   #cornerLogo{
-    position:absolute; left:14px; bottom:14px; z-index:13;
-    width:118px; height:auto; opacity:.9; pointer-events:none;
-    filter:drop-shadow(0 0 10px rgba(0,0,0,.8));
-    user-select:none;
+    position:absolute; left:16px; top:12px; z-index:13;
+    width:clamp(96px, 13vw, 160px); height:auto;
+    opacity:0; transform:translateY(-6px) scale(.96);
+    pointer-events:none; user-select:none;
+    filter:drop-shadow(0 0 10px rgba(0,0,0,.85));
+    transition:opacity .5s ease, transform .5s ease;
   }
-  @media (hover:none) and (pointer:coarse){
-    #cornerLogo{ bottom:132px; width:96px; opacity:.82; }
-  }
+  #cornerLogo.show{ opacity:.92; transform:none; }
   #hud .val{ color:#fff; font-size:18px; }
   #lives{ display:flex; gap:6px; align-items:center; }
   #lives .label{ color:#3df0c0; }
@@ -88,14 +86,16 @@
   }
   .overlay.hidden{ opacity:0; pointer-events:none; }
 
-  /* logo wordmark */
+  /* logo wordmark (splash hero) */
   .logo{
     position:relative;
-    width:78%; max-width:520px;
-    margin-bottom:6px;
-    filter:drop-shadow(0 0 26px rgba(255,90,40,.45));
+    width:min(70vw, 620px);
+    margin-bottom:10px;
+    filter:drop-shadow(0 0 30px rgba(255,90,40,.4));
+    animation:heroIn .7s cubic-bezier(.2,.9,.25,1) both;
   }
-  .logo svg{ width:100%; height:auto; overflow:visible; }
+  .logo svg, .logo img{ width:100%; height:auto; display:block; overflow:visible; }
+  @keyframes heroIn{ from{ opacity:0; transform:translateY(14px) scale(.94);} to{ opacity:1; transform:none; } }
   .tag{
     font-size:13px; letter-spacing:7px; color:#ffd23f;
     text-shadow:0 0 14px rgba(255,160,40,.8);
@@ -198,20 +198,59 @@
 (() => {
 'use strict';
 
-// ---- virtual resolution (classic Galaxian portrait) ----
-const VW = 288, VH = 384;
+// ---- virtual resolution ----
+// Height is fixed; width adapts to the screen's aspect ratio so the playfield
+// fills the entire viewport edge-to-edge with no black bars and no distortion.
+const VH = 384;
+let VW = 288;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 function fitCanvas(){
-  // Render at the virtual resolution scaled by devicePixelRatio; CSS stretches to fit the stage.
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  VW = Math.max(220, Math.round(VH * (w / h)));     // adapt width to aspect ratio
   canvas.width  = VW * dpr;
   canvas.height = VH * dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.imageSmoothingEnabled = false;
+  relayout();
 }
 window.addEventListener('resize', fitCanvas);
+
+// Layout constants derived from current VW (recomputed on resize)
+let COL_SP = 30, ROW_SP = 24, EN_SIZE = 20, FLAG_SIZE = 26, TOP_Y = 70;
+function computeLayout(){
+  COL_SP    = Math.max(26, Math.min(46, VW * 0.72 / (COLS - 1)));
+  ROW_SP    = COL_SP * 0.9;                                   // near-square grid cells
+  EN_SIZE   = Math.max(16, Math.min(24, COL_SP * 0.5));
+  FLAG_SIZE = EN_SIZE * 1.3;
+  TOP_Y     = 60;
+}
+// Home position for a formation slot
+function slotPos(row, col, flagship){
+  const startX = VW/2 - (COLS - 1) * COL_SP / 2;
+  return {
+    x: startX + col * COL_SP + (flagship ? COL_SP/2 : 0),
+    y: TOP_Y + row * ROW_SP,
+    size: flagship ? FLAG_SIZE : EN_SIZE
+  };
+}
+// Recompute everything that depends on VW (called on boot + every resize)
+function relayout(){
+  computeLayout();
+  player.speed = Math.max(150, VW * 0.55);
+  player.y = VH - 40;
+  player.x = Math.max(16, Math.min(VW - 16, player.x));
+  if (typeof initStars === 'function') initStars();
+  if (enemies && enemies.length){
+    for (const e of enemies){
+      const L = slotPos(e.row, e.col, e.flagship);
+      e.homeX = L.x; e.homeY = L.y; e.size = L.size;
+      if (e.state === 'form'){ e.x = e.homeX + formationOffset; e.y = e.homeY; }
+    }
+  }
+}
 
 /* ----------------------------------------------------------
    WANNABE logo mark (Path2D from the supplied SVG, viewBox 492)
@@ -241,43 +280,11 @@ function drawLogo(x, y, size, color, glow){
 }
 
 /* ----------------------------------------------------------
-   WANNABE wordmark (splash) — drawn as styled SVG in DOM
+   WANNABE wordmark (splash hero) — the real brand logo
 ---------------------------------------------------------- */
 function buildWordmark(){
   const el = document.getElementById('logoMark');
-  el.innerHTML = `
-  <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%"  stop-color="#1ea11e"/>
-        <stop offset="50%" stop-color="#1ea11e"/>
-        <stop offset="50.1%" stop-color="#1d54f2"/>
-        <stop offset="100%" stop-color="#1d54f2"/>
-      </linearGradient>
-    </defs>
-    <!-- rainbow arc -->
-    <path d="M70 170 Q500 -40 930 150" fill="none" stroke="#ff2d2d" stroke-width="16" stroke-linecap="round"/>
-    <path d="M70 170 Q500 -40 930 150" fill="none" stroke="#ffd23f" stroke-width="8"  stroke-linecap="round"/>
-    <path d="M86 178 Q500 -18 916 158" fill="none" stroke="#1ea11e" stroke-width="6"  stroke-linecap="round" opacity=".9"/>
-    <!-- starburst -->
-    <g transform="translate(905,120)">
-      <path d="M0,-46 L9,-12 L46,0 L9,12 L0,46 L-9,12 L-46,0 L-9,-12 Z" fill="#fff"/>
-      <path d="M0,-26 L5,-7 L26,0 L5,7 L0,26 L-5,7 L-26,0 L-5,-7 Z" fill="#fff"/>
-    </g>
-    <!-- wordmark -->
-    <text x="500" y="290" text-anchor="middle"
-          font-family="'Arial Black', Impact, sans-serif"
-          font-size="210" font-weight="900" font-style="italic"
-          letter-spacing="-6"
-          fill="url(#fillGrad)" stroke="#ff2d2d" stroke-width="14"
-          paint-order="stroke" style="stroke-linejoin:round">WANNABE</text>
-    <text x="500" y="290" text-anchor="middle"
-          font-family="'Arial Black', Impact, sans-serif"
-          font-size="210" font-weight="900" font-style="italic"
-          letter-spacing="-6"
-          fill="none" stroke="#ffd23f" stroke-width="5"
-          paint-order="stroke" style="stroke-linejoin:round">WANNABE</text>
-  </svg>`;
+  el.innerHTML = `<img src="logo_galaxian.svg" alt="WANNABE" draggable="false" />`;
 }
 
 /* ----------------------------------------------------------
@@ -395,7 +402,8 @@ const ROW_DEFS = [
 /* ---- starfield ---- */
 function initStars(){
   stars = [];
-  for (let i=0;i<70;i++){
+  const count = Math.round(VW * 0.24);   // density scales with width → fills wide screens
+  for (let i=0;i<count;i++){
     stars.push({
       x: Math.random()*VW, y: Math.random()*VH,
       s: Math.random()*1.6+0.4,
@@ -407,9 +415,8 @@ function initStars(){
 
 /* ---- formation build ---- */
 function buildFormation(){
+  computeLayout();
   enemies = [];
-  const startX = VW/2 - (COLS-1)*26/2;
-  const topY = 70;
   for (let r=0;r<ROW_DEFS.length;r++){
     const def = ROW_DEFS[r];
     // flagship row only has 2 (like reference)
@@ -418,12 +425,12 @@ function buildFormation(){
       let homeCol;
       if (def.flagship){ homeCol = c===0 ? 2 : 5; }
       else homeCol = c;
+      const L = slotPos(r, homeCol, def.flagship);
       enemies.push({
         row:r, col:homeCol,
-        homeX: startX + homeCol*26 + (def.flagship?13:0),
-        homeY: topY + r*24,
+        homeX: L.x, homeY: L.y,
         x:0, y:0,
-        size: def.flagship ? 26 : 20,
+        size: L.size,
         color:def.color, glow:def.glow, score:def.score,
         flagship:!!def.flagship,
         state:'form',          // 'form' | 'dive' | 'return'
@@ -572,6 +579,7 @@ function startGame(){
   diveTimer=1.5;
   hideOverlay('splash'); hideOverlay('gameover');
   document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('cornerLogo').classList.add('show');  // logo flies to top-left
   updateHUD();
   state=State.PLAYING;
   Sound.startMusic();
