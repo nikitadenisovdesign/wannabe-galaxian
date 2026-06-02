@@ -236,12 +236,13 @@ window.addEventListener('resize', fitCanvas);
 // Layout constants derived from current VW (recomputed on resize)
 let COL_SP = 30, ROW_SP = 24, EN_SIZE = 20, FLAG_SIZE = 26, TOP_Y = 70;
 function computeLayout(){
-  // dense, tightly-packed formation (like the arcade reference)
-  COL_SP    = Math.min(40, VW * 0.84 / (COLS - 1));
-  EN_SIZE   = Math.max(11, Math.min(30, COL_SP * 0.82));     // ships nearly touching
-  FLAG_SIZE = EN_SIZE * 1.22;
-  ROW_SP    = EN_SIZE * 1.12;                                // rows tightly stacked
-  TOP_Y     = 76;                                            // clear the HUD
+  // dense, tightly-packed block that sits in the UPPER part of the field,
+  // leaving plenty of empty space toward the bottom (like the arcade reference)
+  COL_SP    = Math.min(34, VW * 0.72 / (COLS - 1));
+  EN_SIZE   = Math.max(11, Math.min(22, COL_SP * 0.72));     // compact ships
+  FLAG_SIZE = EN_SIZE * 1.25;
+  ROW_SP    = EN_SIZE * 1.06;                                // rows tightly stacked
+  TOP_Y     = 64;                                            // just below the HUD
 }
 // Home position for a formation slot
 function slotPos(row, col, flagship){
