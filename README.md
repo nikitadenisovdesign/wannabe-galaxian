@@ -18,6 +18,7 @@ python3 -m http.server 8753
 | Move | ◀ / ▶ arrows | on-screen pad |
 | Fire | `Space` | ✦ button |
 | Pause | `P` | — |
+| Sound on/off | `M` | 🔊 button (top-right) |
 | Start / Restart | `Space` / tap | tap |
 
 ## Features

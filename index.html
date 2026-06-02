@@ -41,13 +41,38 @@
   #hud{
     position:absolute; top:0; left:0; right:0;
     display:flex; justify-content:space-between;
-    padding:14px 18px 0;
+    padding:14px 52px 0 18px;
     color:#fff; font-size:15px; letter-spacing:2px;
     text-shadow:0 0 8px rgba(120,140,255,.7);
     pointer-events:none; z-index:5;
   }
   #hud.hidden{ display:none; }
   #hud .label{ color:#ff4d4d; font-size:11px; display:block; letter-spacing:3px; }
+
+  /* sound toggle */
+  #muteBtn{
+    position:absolute; top:10px; right:10px; z-index:14;
+    width:32px; height:32px; border-radius:9px;
+    background:rgba(18,26,64,.55); border:1px solid rgba(120,150,255,.45);
+    color:#cfe0ff; font-size:15px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(3px); transition:background .15s, transform .1s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #muteBtn:hover{ background:rgba(40,60,140,.65); }
+  #muteBtn:active{ transform:scale(.92); }
+  #muteBtn.muted{ color:#ff7a7a; border-color:rgba(255,120,120,.5); }
+
+  /* corner brand mark */
+  #cornerLogo{
+    position:absolute; left:14px; bottom:14px; z-index:13;
+    width:118px; height:auto; opacity:.9; pointer-events:none;
+    filter:drop-shadow(0 0 10px rgba(0,0,0,.8));
+    user-select:none;
+  }
+  @media (hover:none) and (pointer:coarse){
+    #cornerLogo{ bottom:132px; width:96px; opacity:.82; }
+  }
   #hud .val{ color:#fff; font-size:18px; }
   #lives{ display:flex; gap:6px; align-items:center; }
   #lives .label{ color:#3df0c0; }
@@ -129,6 +154,10 @@
       <div id="lives"><span class="label">LIVES</span><span class="val" id="livesVal">3</span></div>
     </div>
 
+    <!-- sound toggle + brand mark -->
+    <button id="muteBtn" title="Sound on/off (M)" aria-label="Toggle sound">🔊</button>
+    <img id="cornerLogo" src="logo_galaxian.svg" alt="Galaxian" draggable="false" />
+
     <!-- SPLASH -->
     <div class="overlay" id="splash">
       <div class="logo" id="logoMark"></div>
@@ -138,7 +167,8 @@
       <div class="sub">
         <span class="keycap">◀</span><span class="keycap">▶</span> move &nbsp;·&nbsp;
         <span class="keycap">SPACE</span> fire &nbsp;·&nbsp;
-        <span class="keycap">P</span> pause
+        <span class="keycap">P</span> pause &nbsp;·&nbsp;
+        <span class="keycap">M</span> sound
       </div>
     </div>
 
@@ -256,11 +286,13 @@ function buildWordmark(){
 const Sound = (() => {
   let ac = null, master = null;
   let musicTimer = null, musicStep = 0;
+  let muted = false;
+  try { muted = localStorage.getItem('wannabe_muted') === '1'; } catch(e){}
   function ensure(){
     if (ac) return;
     ac = new (window.AudioContext || window.webkitAudioContext)();
     master = ac.createGain();
-    master.gain.value = 0.35;
+    master.gain.value = muted ? 0 : 0.35;
     master.connect(ac.destination);
   }
   function resume(){ ensure(); if (ac.state === 'suspended') ac.resume(); }
@@ -297,6 +329,8 @@ const Sound = (() => {
 
   return {
     resume,
+    isMuted(){ return muted; },
+    setMuted(m){ muted = !!m; try{ localStorage.setItem('wannabe_muted', muted?'1':'0'); }catch(e){} if (master) master.gain.value = muted ? 0 : 0.35; },
     shoot(){ tone(880, 0.12, 'square', 0.18, 1500); tone(1320,0.08,'square',0.08,2000); },
     dive(){ tone(180, 0.5, 'sawtooth', 0.14, 720); },
     explosion(){ noise(0.4, 0.5, 1200); tone(120,0.3,'square',0.18,40); },
@@ -470,6 +504,7 @@ addEventListener('keydown', e=>{
   keys[e.key]=true;
   if (e.key===' '||e.key==='Spacebar'){ onAction(); }
   if (e.key==='p'||e.key==='P') togglePause();
+  if (e.key==='m'||e.key==='M') toggleMute();
 }, {passive:false});
 addEventListener('keyup', e=>{ keys[e.key]=false; });
 
@@ -492,6 +527,18 @@ let fireHold=false;
 
 // tap anywhere on splash/gameover to start
 document.getElementById('stage').addEventListener('pointerdown', ()=>{ Sound.resume(); if (state===State.SPLASH||state===State.GAMEOVER) onAction(); });
+
+// sound on/off
+const muteBtn = document.getElementById('muteBtn');
+function refreshMuteBtn(){
+  const m = Sound.isMuted();
+  muteBtn.textContent = m ? '🔇' : '🔊';
+  muteBtn.classList.toggle('muted', m);
+  muteBtn.title = (m ? 'Sound off' : 'Sound on') + ' — press M';
+}
+function toggleMute(){ Sound.resume(); Sound.setMuted(!Sound.isMuted()); refreshMuteBtn(); }
+muteBtn.addEventListener('pointerdown', e=>{ e.stopPropagation(); });
+muteBtn.addEventListener('click', e=>{ e.stopPropagation(); toggleMute(); });
 
 function onAction(){
   Sound.resume();
@@ -898,6 +945,7 @@ function boot(){
   document.getElementById('hud').classList.add('hidden');
   updateHUD();
   document.getElementById('hiscore').textContent=game.hi;
+  refreshMuteBtn();
   requestAnimationFrame(loop);
 }
 boot();
