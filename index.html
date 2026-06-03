@@ -118,6 +118,45 @@
   .blink{ animation:blink 1.05s steps(2,start) infinite; }
   @keyframes blink{ 50%{ opacity:0 } }
 
+  /* leaderboard */
+  .leaderboard{
+    margin-top:18px; font-family:'Courier New', monospace; font-size:13px;
+    color:#cfe0ff; letter-spacing:1px; min-width:240px; max-width:300px;
+  }
+  .lb-title{ color:#ff2d2d; font-weight:bold; letter-spacing:3px; margin-bottom:7px;
+    text-shadow:0 0 8px rgba(255,60,40,.5); }
+  .lb-empty{ color:#5a6aa0; }
+  .lb-row{ display:flex; align-items:baseline; gap:10px; padding:1.5px 0; }
+  .lb-rank{ width:18px; color:#ffd23f; text-align:right; }
+  .lb-name{ flex:1; text-align:left; color:#fff; padding-left:8px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lb-score{ color:#3b7bff; font-weight:bold; }
+  .lb-new .lb-rank,.lb-new .lb-name,.lb-new .lb-score{ color:#39ff14;
+    animation:lbblink .5s steps(2,start) 8; }
+  @keyframes lbblink{ 50%{ opacity:.25 } }
+  .splash-lb{ margin-top:16px; }
+
+  /* high-score name entry */
+  #nameEntry{ margin-top:18px; }
+  .ne-title{ color:#ffd23f; font-weight:bold; letter-spacing:3px; margin-bottom:10px;
+    text-shadow:0 0 12px rgba(255,190,50,.8); }
+  .ne-row{ display:flex; gap:8px; justify-content:center; }
+  #nameInput{
+    background:rgba(10,16,40,.85); border:2px solid #3b7bff; color:#fff;
+    font-family:'Courier New', monospace; font-size:16px; letter-spacing:3px;
+    text-transform:uppercase; padding:7px 10px; width:170px; border-radius:6px;
+    outline:none; text-align:center;
+  }
+  #nameInput::placeholder{ color:#5a6aa0; letter-spacing:1px; }
+  #nameInput:focus{ border-color:#ffd23f; box-shadow:0 0 14px rgba(255,200,60,.5); }
+  #saveScore{
+    background:#ff2d2d; border:none; color:#fff; font-family:'Courier New', monospace;
+    font-weight:bold; letter-spacing:2px; padding:7px 18px; border-radius:6px; cursor:pointer;
+    transition:background .15s, transform .08s;
+  }
+  #saveScore:hover{ background:#ff5a4a; }
+  #saveScore:active{ transform:scale(.94); }
+
   .start{
     margin-top:34px; font-size:18px; letter-spacing:4px; color:#fff;
     text-shadow:0 0 12px rgba(120,160,255,.9);
@@ -178,6 +217,7 @@
       <div class="tag">★ G A L A X I A N ★</div>
       <div class="start blink">PRESS&nbsp; <span class="keycap">SPACE</span> / TAP&nbsp; TO START</div>
       <div class="score-table" id="scoreTable"></div>
+      <div id="lbSplash" class="leaderboard splash-lb"></div>
       <div class="sub">
         <span class="keycap">◀</span><span class="keycap">▶</span> move &nbsp;·&nbsp;
         <span class="keycap">SPACE</span> fire &nbsp;·&nbsp;
@@ -190,7 +230,15 @@
     <div class="overlay hidden" id="gameover">
       <div class="big lose">GAME&nbsp;OVER</div>
       <div id="finalScore">SCORE 0</div>
-      <div class="start blink" style="margin-top:30px">PRESS <span class="keycap">SPACE</span> TO PLAY AGAIN</div>
+      <div id="nameEntry" class="hidden">
+        <div class="ne-title">★ NEW HIGH SCORE ★</div>
+        <div class="ne-row">
+          <input id="nameInput" maxlength="8" placeholder="YOUR NAME" autocomplete="off" spellcheck="false" />
+          <button id="saveScore">SAVE</button>
+        </div>
+      </div>
+      <div id="lbGameover" class="leaderboard"></div>
+      <div id="goRestart" class="start blink" style="margin-top:22px">PRESS <span class="keycap">SPACE</span> TO PLAY AGAIN</div>
     </div>
 
     <!-- mobile -->
@@ -247,7 +295,7 @@ function computeLayout(){
 function slotPos(row, col, flagship){
   const startX = VW/2 - (COLS - 1) * COL_SP / 2;
   return {
-    x: startX + col * COL_SP + (flagship ? COL_SP/2 : 0),
+    x: startX + col * COL_SP,
     y: TOP_Y + row * ROW_SP,
     size: flagship ? FLAG_SIZE : EN_SIZE
   };
@@ -433,23 +481,35 @@ function initStars(){
 function buildFormation(){
   computeLayout();
   enemies = [];
+  const level = game.level || 1;
+  // the yellow flagship row GROWS each wave: 2, 4, 6, 8 ... up to a full row
+  const flagCount = Math.min(COLS, 2 + (level - 1) * 2);
+  let flagCols;
+  if (flagCount >= COLS){
+    flagCols = Array.from({length:COLS}, (_,i)=>i);
+  } else {
+    flagCols = [];
+    const step = COLS / flagCount;
+    for (let i=0;i<flagCount;i++) flagCols.push(Math.min(COLS-1, Math.floor(i*step + step/2)));
+  }
   for (let r=0;r<ROW_DEFS.length;r++){
     const def = ROW_DEFS[r];
-    // flagship row only has 2 (like reference)
-    const colsThisRow = def.flagship ? 2 : COLS;
-    for (let c=0;c<colsThisRow;c++){
-      let homeCol;
-      if (def.flagship){ homeCol = c===0 ? 3 : 6; }
-      else homeCol = c;
+    const cols = def.flagship ? flagCols : Array.from({length:COLS}, (_,i)=>i);
+    for (let ci=0; ci<cols.length; ci++){
+      const homeCol = cols[ci];
       const L = slotPos(r, homeCol, def.flagship);
+      // fly-in: each row streams in as a neat rank from an alternating side
+      const fromLeft = (r % 2 === 0);
+      const startX = fromLeft ? -40 - (cols.length - ci)*10 : VW + 40 + ci*10;
       enemies.push({
         row:r, col:homeCol,
         homeX: L.x, homeY: L.y,
-        x:0, y:0,
+        x:startX, y:L.y, startX,
         size: L.size,
         color:def.color, glow:def.glow, score:def.score,
         flagship:!!def.flagship,
-        state:'form',          // 'form' | 'dive' | 'return'
+        state:'enter',                       // 'enter' | 'form' | 'dive' | 'return'
+        enterDelay: r*0.16 + ci*0.04, enterT:0, enterDur:0.7,
         t:0, path:null, returnFrom:null,
         fireCD: Math.random()*3+2,
         spin:0, spinV:(Math.random()-0.5)*1.5,
@@ -457,7 +517,6 @@ function buildFormation(){
       });
     }
   }
-  enemies.forEach(e=>{ e.x=e.homeX; e.y=e.homeY; });
 }
 
 /* ----------------------------------------------------------
@@ -523,6 +582,8 @@ function explode(x,y,color,n=16,spd=120){
 ---------------------------------------------------------- */
 const keys = {};
 addEventListener('keydown', e=>{
+  // while typing a high-score name, let the input handle keys
+  if (document.activeElement && document.activeElement.id==='nameInput') return;
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' ','Spacebar'].includes(e.key)) e.preventDefault();
   keys[e.key]=true;
   if (e.key===' '||e.key==='Spacebar'){ onAction(); }
@@ -548,8 +609,17 @@ document.getElementById('fireBtn').addEventListener('touchstart', e=>{ e.prevent
 document.getElementById('fireBtn').addEventListener('touchend', e=>{ e.preventDefault(); fireHold=false; },{passive:false});
 let fireHold=false;
 
-// tap anywhere on splash/gameover to start
-document.getElementById('stage').addEventListener('pointerdown', ()=>{ Sound.resume(); if (state===State.SPLASH||state===State.GAMEOVER) onAction(); });
+// tap anywhere on splash/gameover to start (ignore clicks on the name field / save button)
+document.getElementById('stage').addEventListener('pointerdown', (e)=>{
+  Sound.resume();
+  const t = e.target;
+  if (t && (t.id==='nameInput' || t.id==='saveScore')) return;
+  if (state===State.SPLASH||state===State.GAMEOVER) onAction();
+});
+// high-score name entry
+document.getElementById('saveScore').addEventListener('click', e=>{ e.stopPropagation(); submitScore(); });
+document.getElementById('nameInput').addEventListener('pointerdown', e=>{ e.stopPropagation(); });
+document.getElementById('nameInput').addEventListener('keydown', e=>{ e.stopPropagation(); if (e.key==='Enter') submitScore(); });
 
 // sound on/off
 const muteBtn = document.getElementById('muteBtn');
@@ -566,7 +636,11 @@ muteBtn.addEventListener('click', e=>{ e.stopPropagation(); toggleMute(); });
 function onAction(){
   Sound.resume();
   if (state===State.SPLASH){ startGame(); }
-  else if (state===State.GAMEOVER){ startGame(); }
+  else if (state===State.GAMEOVER){
+    // don't restart until the player has saved their high-score name
+    if (!document.getElementById('nameEntry').classList.contains('hidden')) return;
+    startGame();
+  }
   else if (state===State.PLAYING){ fireBullet(); }
 }
 
@@ -592,8 +666,10 @@ function startGame(){
   player.alive=true; player.x=VW/2;
   bullets=[]; enemyBullets=[]; particles=[];
   buildFormation();
-  diveTimer=1.5;
+  diveTimer=2.2;
   hideOverlay('splash'); hideOverlay('gameover');
+  document.getElementById('nameEntry').classList.add('hidden');
+  document.getElementById('goRestart').classList.remove('hidden');
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('cornerLogo').classList.add('show');  // logo flies to top-left
   updateHUD();
@@ -605,7 +681,7 @@ function nextLevel(){
   game.level++;
   buildFormation();
   bullets=[]; enemyBullets=[];
-  diveTimer=1.0;
+  diveTimer=2.2;
   state=State.PLAYING;
   player.alive=true; player.x=VW/2;
   Sound.startMusic();
@@ -633,13 +709,64 @@ function playerDie(){
   }, 900);
 }
 
+/* ---- leaderboard ---- */
+const LB_MAX = 8;
+let board = loadBoard();
+let pendingScore = 0;
+function loadBoard(){ try{ return JSON.parse(localStorage.getItem('wannabe_lb')||'[]'); }catch(e){ return []; } }
+function saveBoard(){ try{ localStorage.setItem('wannabe_lb', JSON.stringify(board)); }catch(e){} }
+function boardTop(){ return board.length ? board[0].score : 0; }
+function qualifies(score){ return score>0 && (board.length < LB_MAX || score > board[board.length-1].score); }
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function addToBoard(name, score){
+  const entry = { name:(name||'YOU').toUpperCase().slice(0,8), score };
+  board.push(entry);
+  board.sort((a,b)=>b.score-a.score);
+  board = board.slice(0, LB_MAX);
+  saveBoard();
+  return board.indexOf(entry);
+}
+function renderBoard(id, highlight){
+  const el = document.getElementById(id); if (!el) return;
+  if (!board.length){ el.innerHTML = '<div class="lb-title">HIGH SCORES</div><div class="lb-empty">— no scores yet —</div>'; return; }
+  const rows = board.map((e,i)=>
+    `<div class="lb-row${i===highlight?' lb-new':''}"><span class="lb-rank">${i+1}</span><span class="lb-name">${escapeHtml(e.name)}</span><span class="lb-score">${e.score}</span></div>`
+  ).join('');
+  el.innerHTML = '<div class="lb-title">HIGH SCORES</div>' + rows;
+}
+function submitScore(){
+  const inp = document.getElementById('nameInput');
+  const idx = addToBoard(inp.value.trim() || 'YOU', pendingScore);
+  game.hi = boardTop();
+  try{ localStorage.setItem('wannabe_hi', game.hi); }catch(e){}
+  document.getElementById('nameEntry').classList.add('hidden');
+  document.getElementById('goRestart').classList.remove('hidden');
+  renderBoard('lbGameover', idx);
+  renderBoard('lbSplash', -1);
+  updateHUD();
+}
+
 function gameOver(){
   state=State.GAMEOVER;
   Sound.stopMusic();
-  if (game.score>game.hi){ game.hi=game.score; localStorage.setItem('wannabe_hi',game.hi); }
+  if (game.score>game.hi){ game.hi=game.score; try{ localStorage.setItem('wannabe_hi',game.hi); }catch(e){} }
   document.getElementById('finalScore').textContent='SCORE '+game.score;
+  pendingScore = game.score;
+  const ne = document.getElementById('nameEntry');
+  const go = document.getElementById('goRestart');
+  if (qualifies(game.score)){
+    ne.classList.remove('hidden');
+    go.classList.add('hidden');
+    renderBoard('lbGameover', -1);
+    showOverlay('gameover');
+    setTimeout(()=>{ const i=document.getElementById('nameInput'); i.value=''; i.focus(); }, 80);
+  } else {
+    ne.classList.add('hidden');
+    go.classList.remove('hidden');
+    renderBoard('lbGameover', -1);
+    showOverlay('gameover');
+  }
   updateHUD();
-  showOverlay('gameover');
 }
 
 function addScore(n){
@@ -695,16 +822,30 @@ function update(dt){
     if (fireHold) fireBullet();
   }
 
-  // formation sway
-  formationSway += dt*1.1;
-  formationOffset = Math.sin(formationSway)*10;
+  // formation sway — frozen while a wave is still flying in
+  const entering = enemies.some(e=>e.alive && e.state==='enter');
+  if (!entering){
+    formationSway += dt*1.1;
+    formationOffset = Math.sin(formationSway)*10;
+  }
 
   // enemies
   let aliveForm=0;
   for (const e of enemies){
     if (!e.alive) continue;
     e.spin += e.spinV*dt;
-    if (e.state==='form'){
+    if (e.state==='enter'){
+      e.enterT += dt;
+      const tt = e.enterT - e.enterDelay;
+      if (tt <= 0){ e.x = e.startX; e.y = e.homeY; }
+      else {
+        const p = Math.min(1, tt / e.enterDur);
+        const ease = 1 - Math.pow(1-p, 3);                 // easeOutCubic glide into rank
+        e.x = e.startX + (e.homeX + formationOffset - e.startX) * ease;
+        e.y = e.homeY;
+        if (p >= 1) e.state = 'form';
+      }
+    } else if (e.state==='form'){
       aliveForm++;
       e.x = e.homeX + formationOffset;
       e.y = e.homeY;
@@ -973,8 +1114,10 @@ function boot(){
   buildFormation();              // show idle formation behind splash? keep empty stage
   enemies=[];                    // splash: just stars
   document.getElementById('hud').classList.add('hidden');
+  game.hi = Math.max(boardTop(), +(localStorage.getItem('wannabe_hi')||0));
   updateHUD();
   document.getElementById('hiscore').textContent=game.hi;
+  renderBoard('lbSplash', -1);
   refreshMuteBtn();
   requestAnimationFrame(loop);
 }

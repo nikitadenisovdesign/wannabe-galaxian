@@ -24,6 +24,8 @@ python3 -m http.server 8753
 ## Features
 
 - 🛸 **Authentic Galaxian formation + dive attacks** — enemies swoop down in bézier-curve arcs and fire at you. Shooting a diver scores **double**.
+- 🌊 **Endless escalating waves** — clear the screen and a fresh wave *flies in* in formation, with the yellow flagship row growing each time (2 → 4 → 6 … up to a full row).
+- 🏆 **Local leaderboard** — beat a top-8 score and enter your name; high scores persist in `localStorage` and show on the splash + game-over screens.
 - 🌈 **WANNABE wordmark splash** styled like the Galaxian title screen (rainbow arc + starburst).
 - 👾 **Enemies are the WANNABE logo mark** (the real SVG), color-tiered like the original arcade: gold flagships, red, purple, and three teal rows.
 - 🔊 **Fully synthesized sound** via Web Audio — shooting, explosions, dive sirens, the bouncy bass loop, extra-life and stage-clear jingles.
